@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heizen — Outcome SLA Pricing Framework</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg-secondary: #f5f5f3;
+    --bg-tertiary: #eeede8;
+    --text-primary: #1a1a18;
+    --text-secondary: #6b6b66;
+    --border: rgba(0,0,0,0.1);
+    --border-strong: rgba(0,0,0,0.18);
+    --success-bg: #e1f5ee;
+    --success-text: #0f6e56;
+    --info-bg: #e6f1fb;
+    --info-text: #185fa5;
+    --danger-text: #a32d2d;
+    --accent: #1D9E75;
+    --accent-light: rgba(29,158,117,0.07);
+    --blue: #378ADD;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1c;
+      --bg-secondary: #2a2a28;
+      --bg-tertiary: #323230;
+      --text-primary: #f0f0ec;
+      --text-secondary: #9a9a94;
+      --border: rgba(255,255,255,0.1);
+      --border-strong: rgba(255,255,255,0.18);
+      --success-bg: #04342c;
+      --success-text: #9fe1cb;
+      --info-bg: #042c53;
+      --info-text: #b5d4f4;
+      --danger-text: #f09595;
+      --accent: #1D9E75;
+      --accent-light: rgba(29,158,117,0.09);
+      --blue: #378ADD;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+    padding: 2rem;
+  }
+
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .header-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+  }
+
+  .header-badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-radius: var(--radius);
+    font-weight: 500;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .metric {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .metric-sub {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .control-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .control-row input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .control-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .val {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 58px;
+    text-align: right;
+  }
+
+  .fees {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .fee-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+  }
+
+  .fee-input {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  input[type=number] {
+    background: transparent;
+    border: none;
+    border-bottom: 0.5px solid var(--border-strong);
+    font-size: 13px;
+    color: var(--text-primary);
+    padding: 3px 4px;
+    text-align: right;
+    outline: none;
+    width: 90px;
+    font-family: inherit;
+  }
+
+  input[type=number]:focus { border-bottom-color: var(--accent); }
+
+  hr {
+    border: none;
+    border-top: 0.5px solid var(--border);
+    margin: 1.5rem 0;
+  }
+
+  .table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  th {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 7px 8px;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--text-primary);
+    vertical-align: middle;
+  }
+
+  input.name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 12px;
+    color: var(--text-primary);
+    padding: 2px 0;
+    width: 190px;
+    outline: none;
+    font-family: inherit;
+    text-align: left;
+  }
+
+  input.name-input:focus { border-bottom-color: var(--accent); }
+
+  input.num-input {
+    background: transparent;
+    border: none;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 12px;
+    color: var(--text-primary);
+    padding: 2px 4px;
+    text-align: right;
+    outline: none;
+    font-family: inherit;
+  }
+
+  input.num-input:focus { border-bottom-color: var(--accent); }
+
+  select.type-select {
+    font-size: 11px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: var(--radius);
+    font-weight: 500;
+  }
+
+  .badge-land { background: var(--success-bg); color: var(--success-text); }
+  .badge-expand { background: var(--info-bg); color: var(--info-text); }
+
+  .del-btn {
+    font-size: 11px;
+    padding: 2px 7px;
+    cursor: pointer;
+    color: var(--danger-text);
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    font-family: inherit;
+  }
+
+  .del-btn:hover { background: rgba(163,45,45,0.07); }
+
+  .add-btn {
+    font-size: 12px;
+    padding: 5px 14px;
+    cursor: pointer;
+    background: transparent;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: inherit;
+  }
+
+  .add-btn:hover { background: var(--bg-secondary); }
+
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  .ramp-table { font-size: 11px; }
+  .ramp-table th { font-size: 10px; }
+  .ramp-table td { padding: 5px 6px; }
+
+  .footnote {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  @media (max-width: 640px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .controls { grid-template-columns: 1fr; }
+    .fees { grid-template-columns: 1fr 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div>
+      <div class="logo">Heizen<span>.</span></div>
+      <div class="header-sub">Outcome SLA Pricing Framework — Supply Chain</div>
+    </div>
+    <div class="header-badge">Land &amp; Expand</div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Peak monthly recurring</div>
+      <div class="metric-value" id="mMRR">—</div>
+      <div class="metric-sub">at full expansion</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">One-time fees</div>
+      <div class="metric-value" id="mOneTime">—</div>
+      <div class="metric-sub">setup + build</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Year 2 ACV</div>
+      <div class="metric-value" id="mACV">—</div>
+      <div class="metric-sub">full expansion × 12</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">24-month TCV</div>
+      <div class="metric-value" id="mTCV">—</div>
+      <div class="metric-sub">incl. one-time fees</div>
+    </div>
+  </div>
+
+  <div class="section-title">Pricing parameters</div>
+  <div class="controls">
+    <div>
+      <div class="control-label">Client analyst hourly rate</div>
+      <div class="control-row">
+        <input type="range" id="hourlyRate" min="60" max="200" value="100" step="5">
+        <span class="val">$<span id="hrOut">100</span>/hr</span>
+      </div>
+    </div>
+    <div>
+      <div class="control-label">Your capture rate</div>
+      <div class="control-row">
+        <input type="range" id="captureRate" min="20" max="70" value="50" step="5">
+        <span class="val"><span id="crOut">50</span>%</span>
+      </div>
+    </div>
+    <div>
+      <div class="control-label">Maintenance fee (% of SLA)</div>
+      <div class="control-row">
+        <input type="range" id="maintRate" min="5" max="30" value="15" step="1">
+        <span class="val"><span id="mrOut">15</span>%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">One-time fees</div>
+  <div class="fees">
+    <div>
+      <div class="fee-label">Setup — baseline audit &amp; discovery</div>
+      <div class="fee-input"><span>$</span><input type="number" id="setupFee" value="25000" step="1000"></div>
+    </div>
+    <div>
+      <div class="fee-label">Build — platform integration</div>
+      <div class="fee-input"><span>$</span><input type="number" id="buildFee" value="50000" step="1000"></div>
+    </div>
+    <div>
+      <div class="fee-label">Expansion build fee (per module)</div>
+      <div class="fee-input"><span>$</span><input type="number" id="expandFee" value="10000" step="1000"></div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="table-header">
+    <div class="section-title" style="margin:0;">SLA modules — land &amp; expand</div>
+    <button class="add-btn" onclick="addModule()">+ add module</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Module</th>
+        <th>Type</th>
+        <th style="text-align:right;">Hrs saved/mo</th>
+        <th style="text-align:right;">Starts month</th>
+        <th style="text-align:right;">Monthly SLA</th>
+        <th style="text-align:right;">+ Maintenance</th>
+        <th style="text-align:right;">Total/mo</th>
+        <th style="text-align:center;">On</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="modTbody"></tbody>
+  </table>
+
+  <hr>
+
+  <div class="section-title">Monthly recurring revenue — hockey stick</div>
+  <div style="position:relative; width:100%; height:260px;">
+    <canvas id="hockeyChart"></canvas>
+  </div>
+
+  <div class="bottom-grid">
+    <div>
+      <div class="section-title">Fee composition at peak MRR</div>
+      <div style="position:relative; width:100%; height:180px;">
+        <canvas id="feeChart"></canvas>
+      </div>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:#1D9E75;"></span>SLA fees</span>
+        <span><span class="legend-dot" style="background:#378ADD;"></span>Maintenance</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Revenue ramp — month-by-month</div>
+      <div id="rampTable"></div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <span>Heizen · heizen.work · Outcome SLA model — manhours saved × capture rate</span>
+    <span id="genDate"></span>
+  </div>
+
+</div>
+
+<script>
+var modules = [
+  { name: 'Demand planning reports', type: 'land', hours: 180, month: 1, active: true },
+  { name: 'Supplier lead time tracking', type: 'expand', hours: 240, month: 3, active: true },
+  { name: 'Stockout exception management', type: 'expand', hours: 300, month: 6, active: true },
+  { name: 'Freight & logistics reconciliation', type: 'expand', hours: 400, month: 9, active: true },
+  { name: 'New geography / BU rollout', type: 'expand', hours: 500, month: 12, active: true },
+  { name: 'Executive S&OP reporting', type: 'expand', hours: 200, month: 15, active: true },
+  { name: 'Supplier portal integration', type: 'expand', hours: 180, month: 18, active: false },
+];
+
+function getP() {
+  return {
+    hr: parseFloat(document.getElementById('hourlyRate').value) || 100,
+    cr: parseFloat(document.getElementById('captureRate').value) / 100 || 0.5,
+    mr: parseFloat(document.getElementById('maintRate').value) / 100 || 0.15,
+    setup: parseFloat(document.getElementById('setupFee').value) || 0,
+    build: parseFloat(document.getElementById('buildFee').value) || 0,
+    expand: parseFloat(document.getElementById('expandFee').value) || 0,
+  };
+}
+
+function modFees(m, p) {
+  var sla = Math.round(m.hours * p.hr * p.cr);
+  var maint = Math.round(sla * p.mr);
+  return { sla: sla, maint: maint, total: sla + maint };
+}
+
+function fmt(n) {
+  n = Math.round(n);
+  if (n >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return '$' + Math.round(n / 1000) + 'K';
+  return '$' + n.toLocaleString();
+}
+
+function mrrAtMonth(month, p) {
+  return modules.filter(function(m) { return m.active && m.month <= month; })
+    .reduce(function(s, m) { return s + modFees(m, p).total; }, 0);
+}
+
+function renderTable() {
+  var p = getP();
+  var html = modules.map(function(m, i) {
+    var f = modFees(m, p);
+    var opacity = m.active ? '1' : '0.4';
+    return '<tr style="opacity:' + opacity + '">'
+      + '<td><input class="name-input" value="' + m.name.replace(/&/g,'&amp;') + '" onchange="modules[' + i + '].name=this.value;"></td>'
+      + '<td><select class="type-select" onchange="modules[' + i + '].type=this.value; update();">'
+      + '<option value="land"' + (m.type === 'land' ? ' selected' : '') + '>land</option>'
+      + '<option value="expand"' + (m.type === 'expand' ? ' selected' : '') + '>expand</option>'
+      + '</select></td>'
+      + '<td style="text-align:right;"><input type="number" class="num-input" value="' + m.hours + '" min="10" max="5000" step="10" onchange="modules[' + i + '].hours=parseFloat(this.value)||0; update();" style="width:56px;"></td>'
+      + '<td style="text-align:right;"><input type="number" class="num-input" value="' + m.month + '" min="1" max="36" step="1" onchange="modules[' + i + '].month=parseInt(this.value)||1; update();" style="width:46px;"></td>'
+      + '<td style="text-align:right; font-weight:500;">' + (m.active ? fmt(f.sla) : '—') + '</td>'
+      + '<td style="text-align:right; color:var(--text-secondary);">' + (m.active ? fmt(f.maint) : '—') + '</td>'
+      + '<td style="text-align:right; font-weight:500;">' + (m.active ? fmt(f.total) : '—') + '</td>'
+      + '<td style="text-align:center;"><input type="checkbox"' + (m.active ? ' checked' : '') + ' onchange="modules[' + i + '].active=this.checked; update();"></td>'
+      + '<td><button class="del-btn" onclick="removeModule(' + i + ')">×</button></td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('modTbody').innerHTML = html;
+}
+
+function renderMetrics() {
+  var p = getP();
+  var activeM = modules.filter(function(m) { return m.active; });
+  var peakMRR = activeM.reduce(function(s, m) { return s + modFees(m, p).total; }, 0);
+  var oneTime = p.setup + p.build;
+  var expandCount = activeM.filter(function(m) { return m.type === 'expand'; }).length;
+  oneTime += expandCount * p.expand;
+  var tcv = oneTime;
+  for (var mo = 1; mo <= 24; mo++) tcv += mrrAtMonth(mo, p);
+  document.getElementById('mMRR').textContent = fmt(peakMRR);
+  document.getElementById('mOneTime').textContent = fmt(oneTime);
+  document.getElementById('mACV').textContent = fmt(peakMRR * 12);
+  document.getElementById('mTCV').textContent = fmt(tcv);
+}
+
+var hChart, fChart;
+
+function renderCharts() {
+  var p = getP();
+  var labels = ['Start'];
+  var data = [0];
+  for (var i = 1; i <= 24; i++) { labels.push('M' + i); data.push(mrrAtMonth(i, p)); }
+
+  if (hChart) hChart.destroy();
+  hChart = new Chart(document.getElementById('hockeyChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        fill: true,
+        borderColor: '#1D9E75',
+        backgroundColor: 'rgba(29,158,117,0.07)',
+        tension: 0.25,
+        pointRadius: function(ctx) { return ctx.dataIndex === 0 ? 0 : 3; },
+        pointBackgroundColor: '#1D9E75',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 1.5,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return ' MRR: ' + fmt(c.raw); } } } },
+      scales: {
+        x: { grid: { color: 'rgba(128,128,120,0.1)' }, ticks: { font: { size: 10 }, color: '#888', autoSkip: true, maxTicksLimit: 13 } },
+        y: { grid: { color: 'rgba(128,128,120,0.1)' }, ticks: { font: { size: 10 }, color: '#888', callback: function(v) { return fmt(v); } } }
+      }
+    }
+  });
+
+  var activeM = modules.filter(function(m) { return m.active; });
+  var totalSLA = activeM.reduce(function(s, m) { return s + modFees(m, p).sla; }, 0);
+  var totalMaint = activeM.reduce(function(s, m) { return s + modFees(m, p).maint; }, 0);
+  if (fChart) fChart.destroy();
+  fChart = new Chart(document.getElementById('feeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['SLA fees', 'Maintenance'],
+      datasets: [{ data: [totalSLA, totalMaint], backgroundColor: ['#1D9E75', '#378ADD'], borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { return ' ' + c.label + ': ' + fmt(c.raw); } } } }
+    }
+  });
+}
+
+function renderRampTable() {
+  var p = getP();
+  var milestones = [];
+  var seen = {};
+  modules.filter(function(m) { return m.active; }).forEach(function(m) {
+    if (!seen[m.month]) { seen[m.month] = true; milestones.push(m.month); }
+  });
+  milestones.sort(function(a, b) { return a - b; });
+  var html = '<table class="ramp-table" style="width:100%; border-collapse:collapse;">'
+    + '<tr style="border-bottom:0.5px solid var(--border);">'
+    + '<th style="text-align:left; padding:4px 6px;">Month</th>'
+    + '<th style="text-align:left; padding:4px 6px;">Module</th>'
+    + '<th style="text-align:right; padding:4px 6px;">MRR</th>'
+    + '</tr>';
+  milestones.forEach(function(mo) {
+    var mods = modules.filter(function(m) { return m.active && m.month === mo; });
+    var mrr = mrrAtMonth(mo, p);
+    html += '<tr style="border-bottom:0.5px solid var(--border);">'
+      + '<td style="padding:5px 6px; color:var(--text-secondary);">M' + mo + '</td>'
+      + '<td style="padding:5px 6px; color:var(--text-primary);">' + mods.map(function(m) { return m.name; }).join(', ') + '</td>'
+      + '<td style="padding:5px 6px; text-align:right; font-weight:500;">' + fmt(mrr) + '</td>'
+      + '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('rampTable').innerHTML = html;
+}
+
+function update() {
+  var p = getP();
+  document.getElementById('hrOut').textContent = Math.round(p.hr);
+  document.getElementById('crOut').textContent = Math.round(p.cr * 100);
+  document.getElementById('mrOut').textContent = Math.round(p.mr * 100);
+  renderTable();
+  renderMetrics();
+  renderCharts();
+  renderRampTable();
+}
+
+function addModule() {
+  modules.push({ name: 'New module', type: 'expand', hours: 100, month: modules.length + 1, active: true });
+  update();
+}
+
+function removeModule(i) {
+  modules.splice(i, 1);
+  update();
+}
+
+['hourlyRate', 'captureRate', 'maintRate', 'setupFee', 'buildFee', 'expandFee'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', update);
+});
+
+document.getElementById('genDate').textContent = 'Generated ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+update();
+</script>
+</body>
+</html>
